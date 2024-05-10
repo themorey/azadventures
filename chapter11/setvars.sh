@@ -1,6 +1,5 @@
 export RG=mydemo1
 export REGION=eastus
-export REGION2=southcentralus
 
 export VMNAME=${RG}vm
 
@@ -17,16 +16,18 @@ export STORAGEACCOUNT=${RG}sa
 export KEYVAULT=${RG}kv
 
 export VNETADDRESS=10.20.0.0
-export VNETADDRESS2=10.30.0.0
 export VMVNETNAME=${RG}VNET
 export VMSUBNETNAME=${RG}SUBNET
-export VMVNETNAME2=${RG2}VNET
-export VMSUBNETNAME2=${RG2}SUBNET
-
-export PVTZONEFQDN="private.ccmr.net"
 
 export VPNRG=myvpnrg
 export VPNVNET=myvpnvnet
+
+# MultiRegion cluster settings 
+#export REGION2=southcentralus
+#export VNETADDRESS2=10.30.0.0
+#export VMVNETNAME2=${RG2}VNET
+#export VMSUBNETNAME2=${RG2}SUBNET
+#export PVTZONEFQDN="private.ccmr.net"
 
 # uncomment here to enable tags for resource group
 #export AZURETAGS="'mytagname1=mytagvalue1' 'mytagname2=mytagvalue2'"
