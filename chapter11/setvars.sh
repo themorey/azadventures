@@ -1,9 +1,9 @@
-export RG1=mydemo1
-export REGION1=eastus
+export RG=mydemo1
+export REGION=eastus
 export RG2=mydemo2
 export REGION2=southcentralus
 
-export VMNAME1=${RG1}vm
+export VMNAME=${RG}vm
 
 export SKUCYCLECLOUD=Standard_E4s_v4
 export SKUSCHEDULER=Standard_D4ads_v5
@@ -14,13 +14,13 @@ export SKUHPCNODES=Standard_HB120rs_v2
 export VMIMAGE=almalinux:almalinux-hpc:8_7-hpc-gen2:latest
 export ADMINUSER=azureuser
 
-export STORAGEACCOUNT=${RG1}sa
-export KEYVAULT=${RG1}kv
+export STORAGEACCOUNT=${RG}sa
+export KEYVAULT=${RG}kv
 
-export VNETADDRESS1=10.20.0.0
+export VNETADDRESS=10.20.0.0
 export VNETADDRESS2=10.30.0.0
-export VMVNETNAME1=${RG1}VNET
-export VMSUBNETNAME1=${RG1}SUBNET
+export VMVNETNAME=${RG}VNET
+export VMSUBNETNAME=${RG}SUBNET
 export VMVNETNAME2=${RG2}VNET
 export VMSUBNETNAME2=${RG2}SUBNET
 
