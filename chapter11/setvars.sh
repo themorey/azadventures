@@ -1,6 +1,5 @@
 export RG=mydemo1
 export REGION=eastus
-export RG2=mydemo2
 export REGION2=southcentralus
 
 export VMNAME=${RG}vm
