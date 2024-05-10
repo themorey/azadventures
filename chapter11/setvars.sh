@@ -24,6 +24,8 @@ export VMSUBNETNAME=${RG}SUBNET
 export VMVNETNAME2=${RG2}VNET
 export VMSUBNETNAME2=${RG2}SUBNET
 
+export PVTZONEFQDN="private.ccmr.net"
+
 export VPNRG=myvpnrg
 export VPNVNET=myvpnvnet
 
