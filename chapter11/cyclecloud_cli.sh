@@ -183,7 +183,7 @@ function set_subscription() {
 function create_resource_group() {
 
   set -x
-  showmsg "Create resource group: $RG1"
+  showmsg "Create resource group: $RG"
 
   if [[ -z ${AZURETAGS-} ]]; then
     cmd="az group create --location '$REGION' --name '$RG'"
@@ -213,41 +213,42 @@ function create_vnet_subnet() {
 function create_multiregion_infra() {
 
   set -x
-  showmsg "Create resource group: $RG2"
-  
-  if [[ -z ${AZURETAGS-} ]]; then
-    cmd="az group create --location '$REGION2' --name '$RG2'"
-  else
-    cmd="az group create --location '$REGION2' \\
-         --name '$RG2' \\
-         --tags ${AZURETAGS}"
-  fi
 
-  echo "$cmd"
-  eval "${cmd}"
-  
-  showmsg "Create RG/VNET/VSUBNET: $RG2/$VMVNETNAME2/$VMSUBNETNAME2"
-  az network vnet create -g "$RG2" \
+  # test if VNET2 exists, if not create it
+  az network vnet list -g $RG --output tsv |grep -q $VMVNETNAME2 || \
+  showmsg "Create RG/VNET/VSUBNET: $RG/$VMVNETNAME2/$VMSUBNETNAME2" && \
+  az network vnet create -g "$RG" \
     -n "$VMVNETNAME2" \
     --address-prefix "$VNETADDRESS2"/24 \
     --subnet-name "$VMSUBNETNAME2" \
     --subnet-prefixes "$VNETADDRESS2"/25
 
-  showmsg "Peer VNETs: $RG/$VMVNETNAME/$RG2/$VMVNETNAME2"
-  az network vnet peering create -g $RG -n ${VMVNETNAME}To${VMVNETNAME2} \
-    --vnet-name $VMVNETNAME --remote-vnet $VMVNETNAME2 --allow-vnet-access
-  az network vnet peering create -g $RG -n ${VMVNETNAME2}To${VMVNETNAME} \
-    --vnet-name $VMVNETNAME2 --remote-vnet $VMVNETNAME --allow-vnet-access
+  if az network vnet peering list -g $RG --vnet-name $VMVNETNAME -o tsv | grep -q $VMVNETNAME2; then
+    showmsg "VNETs are already peered: $RG/$VMVNETNAME/$VMVNETNAME2"
+  else
+    showmsg "Peering VNETs: $RG/$VMVNETNAME/$VMVNETNAME2"
+    az network vnet peering create -g $RG -n ${VMVNETNAME}To${VMVNETNAME2} \
+      --vnet-name $VMVNETNAME --remote-vnet $VMVNETNAME2 --allow-vnet-access
+    az network vnet peering create -g $RG -n ${VMVNETNAME2}To${VMVNETNAME} \
+      --vnet-name $VMVNETNAME2 --remote-vnet $VMVNETNAME --allow-vnet-access
+  fi
+    
+  if az network private-dns zone list -g $RG -o tsv | grep -q $PVTZONEFQDN; then
+    showmsg "Skipping...Private DNS Zone ($RG/$PVTZONEFQDN) exists"
+  else  
+    showmsg "Create Private DNS Zone: $RG/$PVTZONEFQDN"
+    az network private-dns zone create -g $RG -n $PVTZONEFQDN
+  fi  
 
-  showmsg "Create Private DNS Zone: $RG/$VMVNETNAME/$VMVNETNAME2"
-  az network private-dns zone create -g $RG \
-    -n $PVTZONEFQDN
-
-  showmsg "Link VNETs to Private DNS Zone: $PVTZONEFQDN/$VMVNETNAME/$VMVNETNAME2"
-  az network private-dns link vnet create -g $RG -n CCMRClusterLink1 \
-    -z $PVTZONEFQDN -v $VMVNETNAME -e true
-  az network private-dns link vnet create -g $RG -n CCMRClusterLink2 \
-    -z $PVTZONEFQDN -v $VMVNETNAME2 -e true
+  if az network private-dns link vnet list -g $RG -z $PVTZONEFQDN -o tsv | grep -Eq $VMVNETNAME.*$VMVNETNAME2"; then
+    showmsg "Skipping...Private DNS Zone Network Link exists"
+  else
+    showmsg "Link VNETs to Private DNS Zone: $PVTZONEFQDN/$VMVNETNAME/$VMVNETNAME2"
+    az network private-dns link vnet create -g $RG -n SlurmClusterLink1 \
+      -z $PVTZONEFQDN -v $VMVNETNAME -e true
+    az network private-dns link vnet create -g $RG -n SlurmClusterLink2 \
+      -z $PVTZONEFQDN -v $VMVNETNAME2 -e true
+  fi
    
   showstatusmsg "done"
 }
