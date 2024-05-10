@@ -15,9 +15,9 @@ IFS=$'\n\t'
 : ${STORAGEACCOUNT:=${RG}sa}
 : ${KEYVAULT:=${RG}kv}
 
-: ${VNETADDRESS:=10.38.0.0}
-: ${VMVNETNAME:=${RG}VNET}
-: ${VMSUBNETNAME:=${RG}SUBNET}
+: ${VNETADDRESS1:=10.20.0.0}
+: ${VMVNETNAME1:=${RG}VNET}
+: ${VMSUBNETNAME1:=${RG}SUBNET}
 
 : ${SKUCYCLECLOUD:=Standard_B2ms}
 : ${SKUSCHEDULER:=Standard_F2s_v2}
@@ -31,10 +31,10 @@ IFS=$'\n\t'
 CIDRVNETADDRESS="$VNETADDRESS"/16
 CIDRSUBVNETADDRESS="$VNETADDRESS"/21
 
-HPCNCORES=5000
-HTCNCORES=5000
+HPCNCORES=1000
+HTCNCORES=1000
 
-CYCLECLOUDVERSION=8.5.0-3196
+CYCLECLOUDVERSION=8.6.1-3248
 #CYCLECLOUDVERSION=8.4.0-3122
 
 ##############################################################################
@@ -183,7 +183,7 @@ function set_subscription() {
 function create_resource_group() {
 
   set -x
-  showmsg "Create resource group: $RG"
+  showmsg "Create resource group: $RG1"
 
   if [[ -z ${AZURETAGS-} ]]; then
     cmd="az group create --location '$REGION' --name '$RG'"
@@ -207,6 +207,48 @@ function create_vnet_subnet() {
     --address-prefix "$CIDRVNETADDRESS" \
     --subnet-name "$VMSUBNETNAME" \
     --subnet-prefixes "$CIDRSUBVNETADDRESS"
+  showstatusmsg "done"
+}
+
+function create_multiregion_infra() {
+
+  set -x
+  showmsg "Create resource group: $RG2"
+  
+  if [[ -z ${AZURETAGS-} ]]; then
+    cmd="az group create --location '$REGION2' --name '$RG2'"
+  else
+    cmd="az group create --location '$REGION2' \\
+         --name '$RG2' \\
+         --tags ${AZURETAGS}"
+  fi
+
+  echo "$cmd"
+  eval "${cmd}"
+  
+  showmsg "Create RG/VNET/VSUBNET: $RG2/$VMVNETNAME2/$VMSUBNETNAME2"
+  az network vnet create -g "$RG2" \
+    -n "$VMVNETNAME2" \
+    --address-prefix "$VNETADDRESS2"/24 \
+    --subnet-name "$VMSUBNETNAME2" \
+    --subnet-prefixes "$VNETADDRESS2"/25
+
+  showmsg "Peer VNETs: $RG/$VMVNETNAME/$RG2/$VMVNETNAME2"
+  az network vnet peering create -g $RG -n ${VMVNETNAME}To${VMVNETNAME2} \
+    --vnet-name $VMVNETNAME --remote-vnet $VMVNETNAME2 --allow-vnet-access
+  az network vnet peering create -g $RG -n ${VMVNETNAME2}To${VMVNETNAME} \
+    --vnet-name $VMVNETNAME2 --remote-vnet $VMVNETNAME --allow-vnet-access
+
+  showmsg "Create Private DNS Zone: $RG/$VMVNETNAME/$VMVNETNAME2"
+  az network private-dns zone create -g $RG \
+    -n $PVTZONEFQDN
+
+  showmsg "Link VNETs to Private DNS Zone: $PVTZONEFQDN/$VMVNETNAME/$VMVNETNAME2"
+  az network private-dns link vnet create -g $RG -n CCMRClusterLink1 \
+    -z $PVTZONEFQDN -v $VMVNETNAME -e true
+  az network private-dns link vnet create -g $RG -n CCMRClusterLink2 \
+    -z $PVTZONEFQDN -v $VMVNETNAME2 -e true
+   
   showstatusmsg "done"
 }
 
@@ -707,6 +749,7 @@ log_on
 
 create_resource_group
 create_vnet_subnet
+if [[ ! -z "${RG2}" ]]; then create_multiregion_infra; fi  # if RG2 is defined, call multiregion function
 
 peer_vpn
 create_storage_account
