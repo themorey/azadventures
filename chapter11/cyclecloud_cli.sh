@@ -218,6 +218,7 @@ function create_multiregion_infra() {
   az network vnet list -g $RG --output tsv |grep -q $VMVNETNAME2 || \
   showmsg "Create RG/VNET/VSUBNET: $RG/$VMVNETNAME2/$VMSUBNETNAME2" && \
   az network vnet create -g "$RG" \
+    -l $REGION2 \
     -n "$VMVNETNAME2" \
     --address-prefix "$VNETADDRESS2"/24 \
     --subnet-name "$VMSUBNETNAME2" \
@@ -305,6 +306,8 @@ function create_cluster_cloudinit_files() {
           "HPCMachineType" :  "$SKUHPCNODES",
           "MaxHPCExecuteCoreCount": "$HPCNCORES",
           "MaxHTCExecuteCoreCount": "$HTCNCORES"
+          "SecondaryRegion" : "$REGION2",
+          "SecondarySubnet" : "${RG}/${VMVNETNAME2}/${VMSUBNETNAME2}"
         }
 
     - path: $CREATECLUSTERFILE
@@ -317,6 +320,14 @@ function create_cluster_cloudinit_files() {
          echo "SLURMTEMPLATE=\$SLURMTEMPLATE"
          runuser -l $ADMINUSER -c 'cyclecloud show_cluster  -t' | grep  'slurm.*template'  | awk '{print \$1}'
          SLURMTEMPLATE=\$(runuser -l $ADMINUSER -c 'cyclecloud show_cluster  -t' | grep  "slurm.*template" | cut -d':' -f1)
+         if [[ ! -z "$REGION2" ]]; then
+           runuser -l $ADMINUSER -c 'sudo cp $(sudo find /opt/cycle_server/system/work -name slurm_template*.txt) $HOME/slurm_multiregion.txt'
+           runuser -l $ADMINUSER -c 'sed -i "/nodearray hpc/a SubnetId = \$VMVNETSUBNET2\nRegion = \$REGION2" $HOME/slurm_multiregion.txt'
+           runuser -l $ADMINUSER -c 'sed -i '/parameters Network Attached Storage/i [[parameters MultiRegion]]\n Order = 40\n [[[parameter SecondaryRegion]]\n ParameterType = Cloud.Region\n [[[parameter SecondarySubnet]]]\n ParemeterType = Azure.Subnet\n Required = True\n' $HOME/multiregion.txt
+           runuser -l $ADMINUSER -c "cyclecloud import_cluster $CLUSTERNAME -f $HOME/slurm_multiregion.txt -p /tmp/$CLUSTERPARAMETERFILE"
+         else
+           runuser -l $ADMINUSER -c "cyclecloud create_cluster \$SLURMTEMPLATE $CLUSTERNAME -p /tmp/$CLUSTERPARAMETERFILE"
+         fi
          runuser -l $ADMINUSER -c "cyclecloud create_cluster \$SLURMTEMPLATE $CLUSTERNAME -p /tmp/$CLUSTERPARAMETERFILE"
          runuser -l $ADMINUSER -c "cyclecloud start_cluster $CLUSTERNAME"
 
@@ -750,8 +761,10 @@ log_on
 
 create_resource_group
 create_vnet_subnet
-if [[ ! -z "${RG2}" ]]; then create_multiregion_infra; fi  # if RG2 is defined, call multiregion function
-
+# if REGIONG2 is defined, call multiregion function
+if [[ ! -z "${REGION2}" ]]; then 
+  create_multiregion_infr
+fi  
 peer_vpn
 create_storage_account
 create_keyvault
